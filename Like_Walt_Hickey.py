@@ -14,12 +14,18 @@ import re
 from time import time, sleep
 import datetime
 import random
+from requests import get
+from bs4 import BeautifulSoup
 from selenium import webdriver 
 from selenium.webdriver.common.by import By 
 from selenium.webdriver.support.ui import WebDriverWait 
 from selenium.webdriver.support import expected_conditions as EC 
 from selenium.common.exceptions import TimeoutException
 from selenium.webdriver.common.action_chains import ActionChains
+import mpld3
+from sklearn.preprocessing import StandardScaler
+from sklearn import metrics
+from sklearn.cluster import DBSCAN
 
 
 """
@@ -73,7 +79,6 @@ for i in range(len(table)):
 Adjustment = pd.DataFrame(columns=table[0], data=table[1:])
 Adjustment.set_index('Year', inplace=True)
 
-
 #print(Adjustment)
 
 """
@@ -85,6 +90,7 @@ for i in IDs.index:
     Extract Critic Score
     """
     browser.get("https://www.rottentomatoes.com/m/{}".format(IDs['Rotten Tomatoes'][i]))
+    sleep(random.uniform(0.3, 0.8))
 
 # Wait 20 seconds for page to load
     timeout = 20
@@ -92,7 +98,7 @@ for i in IDs.index:
         WebDriverWait(browser, timeout).until(EC.visibility_of_element_located((By.XPATH, "//span[@class='meter-value superPageFontColor']")))
     except TimeoutException:
         print("Timed out waiting for page to load")
-        browser.quit()
+        continue
         
 
     score_element = browser.find_elements_by_xpath("//span[@class='meter-value superPageFontColor']")
@@ -101,39 +107,31 @@ for i in IDs.index:
     
     #print(score)
     
-    browser.get("https://www.the-numbers.com/movie/{}".format(IDs['The Numbers'][i]))
+    url = "https://www.the-numbers.com/movie/{}".format(IDs['The Numbers'][i])
+    #print(url)
 
-# Wait 20 seconds for page to load
-    timeout = 20
-    try:
-        WebDriverWait(browser, timeout).until(EC.visibility_of_element_located((By.XPATH, "//td[@class='data']")))
-    except TimeoutException:
-        print("Timed out waiting for page to load")
-        browser.quit()
-        
+    response = get(url)
+    html_soup = BeautifulSoup(response.text, 'html.parser')
+    type(html_soup)
+    
     """
     Extract Year
     """
 
-    year_element = browser.find_elements_by_xpath("//h1[@itemprop='name']")
-    year_element = [x for x in year_element if x.text != '']    
-    year_text = [x.text for x in year_element][0]
-    year = re.search('\(.+\s*\d+\s*\)', year_text).group(0)
+    year_soup = html_soup.find_all(['meta content', 'title'])
+    year = re.search('\(.+\s*\d+\s*\)', str(year_soup[0])).group(0)
     year = year.replace("(","")
     year = year.replace(")","")
     
-    #print(year)
-        
     """
     Extract Unadjusted Box Office
     """
-
-    box_office_element = browser.find_elements_by_xpath("//td[@class='data']")
-    box_office_element = [x for x in box_office_element if x.text != '']    
-    box_office = [x.text for x in box_office_element][0] 
-    
-    #print(box_office)
-    
+    box_office_soup = html_soup.find("b", text="Domestic Box Office").parent.parent
+    box_office_soup = html_soup.find("td", class_="data")
+    box_office = re.search('>(.*?)\<',str(box_office_soup)).group(0)
+    box_office = box_office.replace(">","")
+    box_office = box_office.replace("<","")
+   
     """
     Adjust Box Office
     (to 2015 dollars)
@@ -161,14 +159,97 @@ for i in IDs.index:
 
 browser.quit() 
 
-    
+"""
+Visualization
+"""
+
+css = """
+text.mpld3-text, div.mpld3-tooltip {
+  font-family: Arial, Helvetica, sans-serif;
+  font-size: 9px;
+  color: black;
+  opacity: 1.0;
+  padding: 2px;
+  border: 0px;
+}
+"""
+
+fig, ax = plt.subplots(subplot_kw=dict(axisbg='#F0F0F0'))
+
 x = df_final['Rotten Tomatoes Score'].apply(lambda x: float(x.replace('%', '')))
 y = df_final['Adjusted Domestic Box Office Gross'].apply(lambda x: float(x.replace('$', '').replace(',', '')))
 
-plt.scatter(x, y, s=50, color='#0C857F', alpha=0.3)
+
+scatter = ax.scatter(x, y, c='#0C857F', edgecolor='#085652',s=55,alpha=0.3)
+
+
+ax.grid(color='#E3E3E3', linestyle='solid')
+ax.set_title("Types of A24 Films", size=12)
+ax.set_xlabel("Rotten Tomatoes Score")
+ax.set_ylabel("Domestic Box Office Gross")
+plt.gca().set_ylim(0,)
+plt.gca().set_xlim(0,105)
+ax.set_xticks([i*25 for i in range(5)])
+#ylabels = ['${:,.0f}m'.format(label/1000000) for label in ax.get_yticks()]
+#ax.set_yticklabels(ylabels)
+
+labels = df_final['Title'].tolist()
+tooltip = mpld3.plugins.PointHTMLTooltip(scatter, labels=labels, css=css)
+mpld3.plugins.connect(fig, tooltip)
+
+mpld3.enable_notebook()
+mpld3.save_html(fig, "./mpld3_htmltooltip.html")
+#mpld3.show()
+
+sleep(random.uniform(0.3, 0.8))
+
+"""
+Perform DB Scan
+"""
+
+X = list(map(list, zip(x, y)))
+X = StandardScaler().fit_transform(X)
+db = DBSCAN(eps=.45, min_samples=3).fit(X)
+core_samples_mask = np.zeros_like(db.labels_, dtype=bool)
+core_samples_mask[db.core_sample_indices_] = True
+labels = db.labels_
+
+n_clusters_ = len(set(labels)) - (1 if -1 in labels else 0)
+
+print('Estimated number of clusters: %d' % n_clusters_)
+print("Silhouette Coefficient: %0.3f"
+      % metrics.silhouette_score(X, labels))
+      
+sleep(random.uniform(0.3, 0.8))
+
+"""
+Apply Types
+"""
+
+X = np.asarray(list(map(list, zip(x, y))))
+unique_labels = set(labels)
+colors = ['#0C857F', '#FB0101', '#F6FE07', '#211B92']
+edges= ['#085652', '#950101', '#cad101', '#171367']
+for k, col, ed in zip(unique_labels, colors, edges):
+    if k == -1:
+        # Black used for noise.
+        col = [0, 0, 0, 1]
+        ed = 'k'
+    
+    class_member_mask = (labels == k)
+    
+    xy = X[class_member_mask & core_samples_mask]
+    plt.plot(xy[:, 0], xy[:, 1], 'o', markerfacecolor=col,
+             markeredgecolor=ed, markersize=7, alpha=0.6)
+    
+    xy = X[class_member_mask & ~core_samples_mask]
+    plt.plot(xy[:, 0], xy[:, 1], 'o', markerfacecolor=col,
+             markeredgecolor=ed, markersize=5, alpha=0.3)
+
+
+plt.title('Types of A24 Films')
 plt.xlabel("Rotten Tomatoes Score")
 plt.ylabel("Domestic Box Office Gross")
-plt.title("Types of A24 Films")
 
 plt.ylim(0,)
 ax = plt.subplot()
@@ -176,7 +257,7 @@ ax.set_xticks([i*25 for i in range(5)])
 ylabels = ['${:,.0f}m'.format(label/1000000) for label in ax.get_yticks()]
 ax.set_yticklabels(ylabels)
 
-plt.show()    
+plt.show()
 
 
 run_time=time() - start_time
