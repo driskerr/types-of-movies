@@ -7,10 +7,9 @@ Created on Thu Apr  5 21:25:18 2018
 
 """
 TO DO:
-* Get Hover-over function to work with DBSCAN-typed scatter plot
 
-could be better
-~~ Get y-label axes in proper format for html ~~
+* filter by year?
+
 """
 import pandas as pd
 import numpy as np
@@ -73,8 +72,8 @@ plt.gca().set_xlim(0,105)
 #ylabels = ['${:,.0f}m'.format(label/1000000) for label in ax.get_yticks()]
 #ax.set_yticklabels(ylabels)
 
-labels = df_final['Title'].tolist()
-tooltip = mpld3.plugins.PointHTMLTooltip(scatter, labels=labels, css=css, voffset=10, hoffset=10)
+titles = df_final['Title'].tolist()
+tooltip = mpld3.plugins.PointHTMLTooltip(scatter, labels=titles, css=css, voffset=10, hoffset=10)
 mpld3.plugins.connect(fig, tooltip)
 
 mpld3.enable_notebook()
@@ -107,35 +106,55 @@ sleep(random.uniform(0.3, 0.8))
 Apply Types
 """
 
+fig2, ax2 = plt.subplots(subplot_kw=dict(axisbg='#F0F0F0'))
 X = np.asarray(list(map(list, zip(x, y))))
 unique_labels = set(labels)
-colors = ['#0C857F', '#FB0101', '#F6FE07', '#211B92']
-edges= ['#085652', '#950101', '#cad101', '#171367']
+unique_labels = sorted(list(unique_labels))
+#colors = ['#0C857F', '#FB0101', '#F6FE07', '#211B92']
+#edges= ['#085652', '#950101', '#cad101', '#171367']
+colors = [[0, 0, 0, 1], '#FE8C06', '#FB0101', '#211B92']
+edges= ['k', '#B76301', '#950101', '#171367']
 for k, col, ed in zip(unique_labels, colors, edges):
-    if k == -1:
+    #if k == -1:
         # Black used for noise.
-        col = [0, 0, 0, 1]
-        ed = 'k'
+     #   col = [0, 0, 0, 1]
+     #   ed = 'k'
     
     class_member_mask = (labels == k)
     
     xy = X[class_member_mask & core_samples_mask]
-    plt.plot(xy[:, 0], xy[:, 1], 'o', markerfacecolor=col,
-             markeredgecolor=ed, markersize=7, alpha=0.6)
+    scatter1 = ax2.scatter(xy[:, 0], xy[:, 1], c=col, edgecolor=ed, s=55, alpha=0.4)
+    
+    labels1=[i[0] for i in zip(titles, class_member_mask & core_samples_mask) if i[1]==True]
+    if xy.size != 0:         
+        tooltip1 = mpld3.plugins.PointHTMLTooltip(scatter1, labels=labels1, css=css, voffset=10, hoffset=10)
+        mpld3.plugins.connect(fig2, tooltip1)
     
     xy = X[class_member_mask & ~core_samples_mask]
-    plt.plot(xy[:, 0], xy[:, 1], 'o', markerfacecolor=col,
-             markeredgecolor=ed, markersize=5, alpha=0.3)
+    scatter2 = ax2.scatter(xy[:, 0], xy[:, 1], c=col, edgecolor=ed, s=30, alpha=0.2)
+    
+    labels2=[i[0] for i in zip(titles, class_member_mask & ~core_samples_mask) if i[1]==True]         
+    if xy.size != 0:         
+        tooltip2 = mpld3.plugins.PointHTMLTooltip(scatter2, labels=labels2, css=css, voffset=10, hoffset=10)
+        mpld3.plugins.connect(fig2, tooltip2)
+             
+    class_titles = [i[0] for i in zip(titles, class_member_mask) if i[1]==True]
+    
+    print(k, class_titles)
 
 
-plt.title('Types of A24 Films')
-plt.xlabel("Rotten Tomatoes Score")
-plt.ylabel("Domestic Box Office Gross")
+ax2.set_title('Types of A24 Films')
+ax2.set_xlabel("Rotten Tomatoes Score")
+ax2.set_ylabel("Domestic Box Office Gross (millions, 2015 $)")
+plt.gca().set_ylim(0,)
+plt.gca().set_xlim(0,105)
 
-plt.ylim(0,)
-ax = plt.subplot()
-ax.set_xticks([i*25 for i in range(5)])
-ylabels = ['${:,.0f}m'.format(label/1000000) for label in ax.get_yticks()]
-ax.set_yticklabels(ylabels)
+ax2.grid(color='#E3E3E3', linestyle='solid')
+#ax2.set_xticks([i*25 for i in range(5)])
+#ylabels = ['${:,.0f}m'.format(label) for label in ax2.get_yticks()]
+#ax2.set_yticklabels(ylabels)
 
 plt.show()
+
+mpld3.enable_notebook()
+mpld3.save_html(fig2, "./mpld3_htmltooltip_colors.html")
