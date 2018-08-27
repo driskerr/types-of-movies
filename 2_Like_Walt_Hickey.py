@@ -35,7 +35,10 @@ from sklearn.cluster import DBSCAN
 
 
 path = '/Users/kerrydriscoll/Desktop/resumes/A24/types_of_A24.xlsx'
-df_final = pd.read_excel(path)
+xls = pd.ExcelFile(path)
+#get last sheet
+sheet = xls.sheet_names[-1]
+df_final = pd.read_excel(xls, sheet)
 
 
 """
@@ -73,7 +76,7 @@ plt.gca().set_xlim(0,105)
 #ax.set_yticklabels(ylabels)
 
 titles = df_final['Title'].tolist()
-tooltip = mpld3.plugins.PointHTMLTooltip(scatter, labels=titles, css=css, voffset=10, hoffset=10)
+tooltip = mpld3.plugins.PointHTMLTooltip(scatter, labels=titles, css=css, voffset=-10, hoffset=5)
 mpld3.plugins.connect(fig, tooltip)
 
 mpld3.enable_notebook()
@@ -89,7 +92,7 @@ Perform DB Scan
 
 X = list(map(list, zip(x, y)))
 X = StandardScaler().fit_transform(X)
-db = DBSCAN(eps=.45, min_samples=3).fit(X)
+db = DBSCAN(eps=.265, min_samples=3).fit(X)
 core_samples_mask = np.zeros_like(db.labels_, dtype=bool)
 core_samples_mask[db.core_sample_indices_] = True
 labels = db.labels_
@@ -112,8 +115,8 @@ unique_labels = set(labels)
 unique_labels = sorted(list(unique_labels))
 #colors = ['#0C857F', '#FB0101', '#F6FE07', '#211B92']
 #edges= ['#085652', '#950101', '#cad101', '#171367']
-colors = [[0, 0, 0, 1], '#FE8C06', '#FB0101', '#211B92']
-edges= ['k', '#B76301', '#950101', '#171367']
+colors = [[0, 0, 0, 1], '#FE8C06', '#FB0101', '#211B92', '#0C857F']
+edges= ['k', '#B76301', '#950101', '#171367', '#085652']
 for k, col, ed in zip(unique_labels, colors, edges):
     #if k == -1:
         # Black used for noise.
@@ -127,7 +130,7 @@ for k, col, ed in zip(unique_labels, colors, edges):
     
     labels1=[i[0] for i in zip(titles, class_member_mask & core_samples_mask) if i[1]==True]
     if xy.size != 0:         
-        tooltip1 = mpld3.plugins.PointHTMLTooltip(scatter1, labels=labels1, css=css, voffset=10, hoffset=10)
+        tooltip1 = mpld3.plugins.PointHTMLTooltip(scatter1, labels=labels1, css=css, voffset=-10, hoffset=5)
         mpld3.plugins.connect(fig2, tooltip1)
     
     xy = X[class_member_mask & ~core_samples_mask]
@@ -135,7 +138,7 @@ for k, col, ed in zip(unique_labels, colors, edges):
     
     labels2=[i[0] for i in zip(titles, class_member_mask & ~core_samples_mask) if i[1]==True]         
     if xy.size != 0:         
-        tooltip2 = mpld3.plugins.PointHTMLTooltip(scatter2, labels=labels2, css=css, voffset=10, hoffset=10)
+        tooltip2 = mpld3.plugins.PointHTMLTooltip(scatter2, labels=labels2, css=css, voffset=-10, hoffset=5)
         mpld3.plugins.connect(fig2, tooltip2)
              
     class_titles = [i[0] for i in zip(titles, class_member_mask) if i[1]==True]

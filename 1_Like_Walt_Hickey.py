@@ -7,44 +7,22 @@ Created on Tue Apr  3 13:27:54 2018
 
 """
 TO DO:
-* Write mouse-over on ticket price scrub to reveal all years' prices
-* See if I can use BeautifulSoup on Rotten Tomatoes (faster than Selenium)
 """
 
 import pandas as pd
-import numpy as np
-import matplotlib.pyplot as plt
 from pandas import ExcelWriter
 from openpyxl import load_workbook
 import re
-from time import time, sleep
+from time import time
 import datetime
-import random
 from requests import get
 from bs4 import BeautifulSoup
-from selenium import webdriver 
-from selenium.webdriver.common.by import By 
-from selenium.webdriver.support.ui import WebDriverWait 
-from selenium.webdriver.support import expected_conditions as EC 
-from selenium.common.exceptions import TimeoutException
-from selenium.webdriver.common.action_chains import ActionChains
-import mpld3
-from sklearn.preprocessing import StandardScaler
-from sklearn import metrics
-from sklearn.cluster import DBSCAN
 
 
 """
 Measure Runtime to Evaluate Code Performance
 """
 start_time = time()
-
-"""
-Open Web Browser
-"""
-option = webdriver.ChromeOptions()
-option.add_argument(" — incognito")
-browser = webdriver.Chrome(executable_path='/Users/kerrydriscoll/Downloads/chromedriver', chrome_options=option)
 
 """
 Create DataFrame to Populate
@@ -66,23 +44,20 @@ try_again = []
 Get Avg Ticket Price by Year
 Purpose: tp Adjusting Box Office Performance
 """
-browser.get('http://www.natoonline.org/data/ticket-price/')
 
-# Wait 20 seconds for page to load
-timeout = 20
-try:
-    WebDriverWait(browser, timeout).until(EC.visibility_of_element_located((By.XPATH, "//table[@id='tablepress-6']")))
-except TimeoutException:
-    print("Timed out waiting for page to load")
-    browser.quit()
-        
-        
-table_element = browser.find_elements_by_xpath("//table[@id='tablepress-6']")
+url='http://www.natoonline.org/data/ticket-price/'
+ticket_response = get(url)
+ticket_soup = BeautifulSoup(ticket_response.text, 'html.parser')
+
+table_element = ticket_soup.find_all('table', attrs={'id':'tablepress-6'})
 table_element = table_element[0].text
-table = table_element.split('\n')
-for i in range(len(table)):
-    table[i]=table[i].split(' ')
+table = table_element.split('\n\n')
+table = [i.replace('\n','') for i in table[1:-1] if i != '']
+table[0] = [table[0][:4]]+[table[0][4:]]
+for i in range(1,len(table)):
+    table[i]=table[i].split('$')
 Adjustment = pd.DataFrame(columns=table[0], data=table[1:])
+Adjustment['Year'] = [re.sub("[^0-9]", "", i) for i in Adjustment['Year']]
 Adjustment.set_index('Year', inplace=True)
 
 #print(Adjustment)
@@ -94,25 +69,15 @@ for i in IDs.index:
     
     """
     Extract Critic Score
-    """
-    browser.get("https://www.rottentomatoes.com/m/{}".format(IDs['Rotten Tomatoes'][i]))
-    sleep(random.uniform(0.3, 0.8))
+    """    
+    rt_url = "https://www.rottentomatoes.com/m/{}".format(IDs['Rotten Tomatoes'][i])
+    rt_response = get(rt_url)
+    rt_soup = BeautifulSoup(rt_response.text, 'html.parser')
 
-# Wait 20 seconds for page to load
-    timeout = 20
-    try:
-        WebDriverWait(browser, timeout).until(EC.visibility_of_element_located((By.XPATH, "//span[@class='meter-value superPageFontColor']")))
-    except TimeoutException:
-        print("Timed out waiting for page to load")
-        continue
-        
-
-    score_element = browser.find_elements_by_xpath("//span[@class='meter-value superPageFontColor']")
-    score_element = [x for x in score_element if x.text != '']    
-    score = [x.text for x in score_element][0]
+    score_soup = rt_soup.find_all('span', attrs={'class':'meter-value superPageFontColor'})
+    score = score_soup[0].get_text() 
     
     #print(score)
-    
     url = "https://www.the-numbers.com/movie/{}".format(IDs['The Numbers'][i])
     #print(url)
 
@@ -129,6 +94,9 @@ for i in IDs.index:
     year = year.replace("(","")
     year = year.replace(")","")
     
+    if year not in Adjustment.index:
+        year = max(Adjustment.index)
+    
     """
     Extract Unadjusted Box Office
     """
@@ -142,12 +110,12 @@ for i in IDs.index:
     Adjust Box Office
     (to 2015 dollars)
     """
-    release_ticket_value=Adjustment.loc[year].item()
-    release_ticket_value=float(release_ticket_value.replace( '$',''))
+    release_ticket_value=float(Adjustment.loc[year].item())
+    #release_ticket_value=float(release_ticket_value.replace( '$',''))
     release_box_office=float(box_office.replace( '$','').replace(',', ''))
     num_tix = release_box_office / release_ticket_value
-    ticket_value_2015=Adjustment.loc['2015'].item()
-    ticket_value_2015=float(ticket_value_2015.replace( '$',''))
+    ticket_value_2015=float(Adjustment.loc['2015'].item())
+    #ticket_value_2015=float(ticket_value_2015.replace( '$',''))
     
     adjusted_box_office=ticket_value_2015*num_tix
     adjusted_box_office='${:,.2f}'.format(adjusted_box_office)
@@ -163,11 +131,12 @@ for i in IDs.index:
     df_final = df_final.append(df, ignore_index=True)
     df_final = df_final[['Title', 'Year', 'Rotten Tomatoes Score', 'Unadjusted Domestic Box Office Gross','Adjusted Domestic Box Office Gross','Time Stamp']]
 
-browser.quit() 
 
 path = '/Users/kerrydriscoll/Desktop/resumes/A24/types_of_A24.xlsx'
+book = load_workbook(path)
 writer = ExcelWriter(path, engine = 'openpyxl')
-df_final.to_excel(writer)
+writer.book = book
+df_final.to_excel(writer, sheet_name=datetime.date.today().strftime("%Y-%m-%d"))
 writer.save()
 
 
