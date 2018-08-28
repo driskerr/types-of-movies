@@ -20,14 +20,6 @@ import re
 from time import time, sleep
 import datetime
 import random
-from requests import get
-from bs4 import BeautifulSoup
-from selenium import webdriver 
-from selenium.webdriver.common.by import By 
-from selenium.webdriver.support.ui import WebDriverWait 
-from selenium.webdriver.support import expected_conditions as EC 
-from selenium.common.exceptions import TimeoutException
-from selenium.webdriver.common.action_chains import ActionChains
 import mpld3
 from sklearn.preprocessing import StandardScaler
 from sklearn import metrics
