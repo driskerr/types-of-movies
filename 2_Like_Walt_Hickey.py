@@ -32,6 +32,8 @@ import mpld3
 from sklearn.preprocessing import StandardScaler
 from sklearn import metrics
 from sklearn.cluster import DBSCAN
+import hdbscan
+import scipy.cluster.hierarchy as hac
 
 
 path = '/Users/kerrydriscoll/Desktop/resumes/A24/types_of_A24.xlsx'
@@ -106,6 +108,56 @@ print("Silhouette Coefficient: %0.3f"
 sleep(random.uniform(0.3, 0.8))
 
 """
+Alternate HDBSCAN
+"""
+"""
+X = list(map(list, zip(x, y)))
+X = StandardScaler().fit_transform(X)
+hdb = hdbscan.HDBSCAN(min_cluster_size=3, gen_min_span_tree=True).fit(X)
+labels = hdb.labels_
+
+n_clusters_ = len(set(labels)) - (1 if -1 in labels else 0)
+
+print('Estimated number of clusters: %d' % n_clusters_)
+print("Silhouette Coefficient: %0.3f"
+      % metrics.silhouette_score(X, labels))
+      
+unique_labels = set(labels)
+unique_labels = sorted(list(unique_labels))
+
+for k in unique_labels:
+    class_member_mask = (labels == k)
+    class_titles = [i[0] for i in zip(titles, class_member_mask) if i[1]==True] 
+    print(k, class_titles)
+      
+palette = sns.color_palette()
+cluster_colors = [sns.desaturate(palette[col], sat) 
+                  if col >= 0 else (0.5, 0.5, 0.5) for col, sat in 
+                  zip(hdb.labels_, hdb.probabilities_)]
+plt.scatter(X[:, 0], X[:, 1], c=cluster_colors)
+      
+sleep(random.uniform(0.3, 0.8))
+"""
+
+"""
+Alternate HIERARCHICAL AGGLOMERATIVE CLUSTERING
+"""
+#"""
+X = np.asarray(list(map(list, zip(x, y))))
+X = StandardScaler().fit_transform(X)
+
+
+z = hac.linkage(X, method='complete')
+knee = np.diff(z[::-1, 2], 2)
+knee[knee.argmax()] = 0
+num_clust = knee.argmax() + 2
+labels = hac.fcluster(z, num_clust, 'maxclust')
+
+unique_labels = set(labels)
+#"""
+    
+
+"""
 Apply Types
 """
 
@@ -115,8 +167,14 @@ unique_labels = set(labels)
 unique_labels = sorted(list(unique_labels))
 #colors = ['#0C857F', '#FB0101', '#F6FE07', '#211B92']
 #edges= ['#085652', '#950101', '#cad101', '#171367']
-colors = [[0, 0, 0, 1], '#FE8C06', '#FB0101', '#211B92', '#0C857F']
-edges= ['k', '#B76301', '#950101', '#171367', '#085652']
+if min(unique_labels) == -1:
+    colors = [[0, 0, 0, 1], '#FE8C06', '#FB0101', '#211B92', '#0C857F']
+    edges= ['k', '#B76301', '#950101', '#171367', '#085652']
+else:
+    colors = ['#0C857F','#FE8C06', '#FB0101', '#211B92']
+    edges= ['#085652','#B76301', '#950101', '#171367']
+    core_samples_mask = np.repeat(True, len(labels))
+    
 for k, col, ed in zip(unique_labels, colors, edges):
     #if k == -1:
         # Black used for noise.
@@ -160,4 +218,7 @@ ax2.grid(color='#E3E3E3', linestyle='solid')
 plt.show()
 
 mpld3.enable_notebook()
-mpld3.save_html(fig2, "./mpld3_htmltooltip_colors.html")
+if min(unique_labels) == -1:
+    mpld3.save_html(fig2, "./mpld3_htmltooltip_colors_dbscan.html")
+else:
+    mpld3.save_html(fig2, "./mpld3_htmltooltip_colors_hac.html")
