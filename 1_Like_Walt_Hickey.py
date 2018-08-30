@@ -94,8 +94,11 @@ for i in IDs.index:
     year = year.replace("(","")
     year = year.replace(")","")
     
+    
     if year not in Adjustment.index:
-        year = max(Adjustment.index)
+        adj_year = max(Adjustment.index)
+    else:
+        adj_year = year
     
     """
     Extract Unadjusted Box Office
@@ -110,7 +113,7 @@ for i in IDs.index:
     Adjust Box Office
     (to 2015 dollars)
     """
-    release_ticket_value=float(Adjustment.loc[year].item())
+    release_ticket_value=float(Adjustment.loc[adj_year].item())
     #release_ticket_value=float(release_ticket_value.replace( '$',''))
     release_box_office=float(box_office.replace( '$','').replace(',', ''))
     num_tix = release_box_office / release_ticket_value
