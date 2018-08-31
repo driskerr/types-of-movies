@@ -24,6 +24,7 @@ import mpld3
 from sklearn.preprocessing import StandardScaler
 from sklearn import metrics
 from sklearn.cluster import DBSCAN
+from sklearn.cluster import KMeans
 import hdbscan
 import scipy.cluster.hierarchy as hac
 import seaborn as sns
@@ -81,6 +82,32 @@ mpld3.save_html(fig, "./mpld3_htmltooltip.html")
 
 sleep(random.uniform(0.3, 0.8))
 
+"""
+Perform KMeans
+"""
+num_clusters = range(1,10)
+inertias = []
+
+X = list(map(list, zip(x, y)))
+X = StandardScaler().fit_transform(X)
+
+for k in num_clusters:
+    model = KMeans(n_clusters = k)
+    model.fit(X)
+    inertias.append(model.inertia_)
+
+fig3, ax3 = plt.subplots(subplot_kw=dict(axisbg='#F0F0F0'))    
+ax3.plot(num_clusters, inertias, '-o')
+ax3.set_xlabel('Num of Clusters (k)')
+ax3.set_ylabel('Inertia')
+plt.show()
+
+k=int(input("What is the knee value?\nThe point *after* the slope rapidly decreases\n"))
+kmeans = KMeans(n_clusters = k)
+kmeans.fit(X)
+labels = kmeans.predict(X)
+
+unique_labels = set(labels)
 
 """
 Perform DB Scan
@@ -139,7 +166,7 @@ sleep(random.uniform(0.3, 0.8))
 """
 Alternate HIERARCHICAL AGGLOMERATIVE CLUSTERING
 """
-#"""
+"""
 X = np.asarray(list(map(list, zip(x, y))))
 X = StandardScaler().fit_transform(X)
 
@@ -165,8 +192,8 @@ unique_labels = sorted(list(unique_labels))
 #colors = ['#0C857F', '#FB0101', '#F6FE07', '#211B92']
 #edges= ['#085652', '#950101', '#cad101', '#171367']
 
-colors = ['#71B779', '#0E9C95','#F798B5','#FE8C06','#9D5B9A','#8D8D8D', '#CBB977', '#69B3CE', '#907A56']
-edges =  ['#387044', '#085652','#EF3A71','#B76301','#5D355A','#747474', '#BDA652', '#43A0C1', '#705F43']
+colors = ['#FE8C06','#F798B5', '#0E9C95','#71B779','#9D5B9A','#8D8D8D', '#CBB977', '#69B3CE', '#907A56']
+edges =  ['#B76301','#EF3A71', '#085652','#387044','#5D355A','#747474', '#BDA652', '#43A0C1', '#705F43']
 if min(unique_labels) == -1: #only the case for dbscan items that were not classified
     colors = [[0, 0, 0, 1]] + colors
     edges= ['k'] + edges
@@ -198,7 +225,7 @@ for k, col, ed in zip(unique_labels, colors, edges):
              
     class_titles = [i[0] for i in zip(titles, class_member_mask) if i[1]==True]
     
-    print(k, class_titles)
+    print(k, col, class_titles)
     
 
 
@@ -221,7 +248,7 @@ mpld3.enable_notebook()
 if min(unique_labels) == -1:
     mpld3.save_html(fig2, "./mpld3_htmltooltip_colors_dbscan_{}.html".format(datetime.date.today().strftime("%Y-%m-%d")))
 else:
-    mpld3.save_html(fig2, "./mpld3_htmltooltip_colors_hac_{}.html".format(datetime.date.today().strftime("%Y-%m-%d")))
+    mpld3.save_html(fig2, "./mpld3_htmltooltip_colors_kmeans_{}.html".format(datetime.date.today().strftime("%Y-%m-%d")))
     
 # add category labels to source Excel table    
 category_dict = dict(zip(titles, labels))
